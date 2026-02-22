@@ -1,12 +1,27 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import { Platform, AppState } from 'react-native';
+import Constants from 'expo-constants';
 import type { Database } from '../types/supabase';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+// ─── Resolve credentials (3 layers for reliability across all build types) ───
+// 1. process.env (local dev / Metro with .env file)
+// 2. Constants.expoConfig.extra (EAS Build / standalone builds via app.config.js)
+// 3. Hardcoded fallback (prevents crash; auth will fail gracefully if both above are absent)
+const extra = Constants.expoConfig?.extra ?? {};
 
-// SSR-safe storage: avoids `window` access during server rendering (Expo Router SSR)
+const supabaseUrl: string =
+  process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  extra.supabaseUrl ||
+  'https://blhrcjfybdicasjbyuai.supabase.co';
+
+const supabaseAnonKey: string =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  extra.supabaseAnonKey ||
+  'sb_publishable_k4_PJt_DMG2yejBTuwN1rg_9QfL7e4p';
+
+// ─── SSR-safe storage ─────────────────────────────────────────────────────────
+// Avoids `window` / AsyncStorage access during server rendering (Expo Router SSR).
 const isSSR = typeof window === 'undefined';
 
 const ssrSafeStorage = {
@@ -42,6 +57,7 @@ const ssrSafeStorage = {
   },
 };
 
+// ─── Supabase client ──────────────────────────────────────────────────────────
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: ssrSafeStorage as any,
