@@ -1,7 +1,7 @@
 /**
  * Unit tests for Receiver Adapter interface compliance
  */
-import { MockAdapter, ChromecastPlaceholder } from '../../receivers/MockAdapter';
+import { MockAdapter, ChromecastPlaceholder } from '../receivers/MockAdapter';
 
 describe('MockAdapter', () => {
   let adapter: MockAdapter;

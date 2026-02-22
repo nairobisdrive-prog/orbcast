@@ -1,7 +1,7 @@
 /**
  * Unit tests for SSDP response parsing
  */
-import { parseSsdpResponse } from '../../sonos/discovery';
+import { parseSsdpResponse } from '../sonos/discovery';
 
 describe('parseSsdpResponse', () => {
   it('returns null when no Location header', () => {

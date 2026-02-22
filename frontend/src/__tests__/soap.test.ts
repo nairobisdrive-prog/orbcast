@@ -9,7 +9,7 @@ import {
   buildSetVolume,
   AVTRANSPORT_SERVICE,
   RENDERING_CONTROL_SERVICE,
-} from '../../sonos/soapClient';
+} from '../sonos/soapClient';
 
 describe('buildSoapEnvelope', () => {
   it('creates a valid SOAP envelope with correct namespace', () => {
