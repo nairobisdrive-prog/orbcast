@@ -18,10 +18,11 @@ export function GlassPanel({
   intensity = 20,
   radius = radii.lg,
   padding = 20,
+  testID,
 }: GlassPanelProps) {
   return (
     <BlurView intensity={intensity} tint="dark" style={[styles.blur, { borderRadius: radius }, style]}>
-      <View style={[styles.overlay, { borderRadius: radius, padding }]}>
+      <View testID={testID} style={[styles.overlay, { borderRadius: radius, padding }]}>
         {children}
       </View>
     </BlurView>

@@ -125,12 +125,11 @@ export default function Receivers() {
             <View>
               <Text style={styles.sectionLabel}>Additional outputs</Text>
               {OTHER_RECEIVERS.map((r) => (
-                <GlassPanel
-                  testID={`receivers-other-${r.id}`} // Note: GlassPanel doesn't accept testID — use wrapper
-                  key={r.id}
-                  style={styles.deviceCard}
-                  padding={16}
-                >
+                  <GlassPanel
+                      key={r.id}
+                      style={styles.deviceCard}
+                      padding={16}
+                    >
                   <View style={styles.deviceRow}>
                     <Text style={styles.receiverIcon}>{r.icon}</Text>
                     <View style={styles.deviceInfo}>
