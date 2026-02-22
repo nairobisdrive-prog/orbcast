@@ -74,14 +74,9 @@
   "jest": {
     "preset": "jest-expo",
     "testEnvironment": "node",
-    "roots": ["<rootDir>/src"],
-    "testMatch": ["**/__tests__/**/*.test.ts"],
-    "moduleDirectories": ["node_modules", "src"],
-    "transform": {
-      "^.+\\.[jt]sx?$": ["babel-jest", { "presets": ["babel-preset-expo"] }]
-    },
+    "roots": ["<rootDir>/src/__tests__"],
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|@supabase))"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@shopify/react-native-skia|react-native-svg|@supabase))"
     ]
   },
   "private": true,
