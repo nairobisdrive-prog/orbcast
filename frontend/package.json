@@ -11,7 +11,8 @@
     "lint": "expo lint",
     "test": "jest --passWithNoTests",
     "typecheck": "tsc --noEmit",
-    "verify": "yarn typecheck && yarn lint && yarn test"
+    "verify": "yarn typecheck && yarn lint && yarn test",
+    "postinstall": "node -e \"const fs=require('fs'),path=require('path');const src=path.join(__dirname,'node_modules/pretty-format');const dst=path.join(__dirname,'node_modules/expo/node_modules/pretty-format');if(!fs.existsSync(dst)){try{fs.mkdirSync(path.dirname(dst),{recursive:true});fs.symlinkSync(src,dst,'dir');console.log('pretty-format symlink created');}catch(e){console.log('pretty-format symlink skipped:',e.message);}}\""
   },
   "dependencies": {
     "@babel/runtime": "^7.20.6",
