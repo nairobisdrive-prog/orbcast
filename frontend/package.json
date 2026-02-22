@@ -8,7 +8,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "test": "jest --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "verify": "yarn typecheck && yarn lint && yarn test"
   },
   "dependencies": {
     "@babel/runtime": "^7.20.6",
