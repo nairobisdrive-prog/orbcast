@@ -3,7 +3,8 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', '').rstrip('/')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL') or os.environ.get('EXPO_BACKEND_URL', 'https://cast-sonos.preview.emergentagent.com')
+BASE_URL = BASE_URL.rstrip('/')
 
 
 class TestHealth:
