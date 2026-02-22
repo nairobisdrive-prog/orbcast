@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 4 },
   iconBtnText: { fontSize: 20 },
   scroll: { paddingHorizontal: spacing.screenPadding, paddingBottom: 40 },
-  orbStage: { alignItems: 'center', justifyContent: 'center', marginVertical: 16, position: 'relative' },
+  orbStage: { alignItems: 'center', justifyContent: 'center', marginVertical: 8, position: 'relative', maxHeight: 260, height: 260 },
   orbGlow: {
     position: 'absolute',
     width: W * 0.6,
