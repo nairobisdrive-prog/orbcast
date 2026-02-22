@@ -116,7 +116,7 @@ export default function Casting() {
               bass={isMuted ? 0 : metrics.bass}
               presence={metrics.presence}
               volume={isMuted ? 0 : volume}
-              size={W * 0.72}
+              size={W * 0.65}
               isActive={isCasting}
             />
           </Animated.View>
