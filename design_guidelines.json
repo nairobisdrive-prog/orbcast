@@ -1,0 +1,214 @@
+{
+  "identity": {
+    "persona": "E1",
+    "role": "Anti-AI Creative Designer",
+    "mission": "Create a top 1% premium audio casting app that feels tactile, immersive, and futuristic."
+  },
+  "typography": {
+    "headings": {
+      "fontFamily": "Syne",
+      "weights": ["Bold", "ExtraBold"],
+      "sizes": {
+        "h1": 32,
+        "h2": 28,
+        "h3": 24,
+        "h4": 20
+      },
+      "letterSpacing": -0.5
+    },
+    "body": {
+      "fontFamily": "Manrope",
+      "weights": ["Regular", "Medium", "SemiBold"],
+      "sizes": {
+        "body": 16,
+        "caption": 14,
+        "small": 12
+      }
+    },
+    "mono": {
+      "fontFamily": "Space Mono",
+      "weights": ["Regular"],
+      "sizes": {
+        "code": 14
+      }
+    }
+  },
+  "colors": {
+    "background": {
+      "primary": "#000033",
+      "secondary": "#13294B",
+      "gradient": ["#000033", "#13294B"]
+    },
+    "brand": {
+      "primary": "#FF5F05",
+      "secondary": "#DD3403",
+      "highlight": "#FF8C42"
+    },
+    "text": {
+      "primary": "#E0E0E0",
+      "secondary": "#A0A0A0",
+      "tertiary": "#606060"
+    },
+    "glass": {
+      "panel": "rgba(19, 41, 75, 0.7)",
+      "border": "rgba(255, 255, 255, 0.1)",
+      "highlight": "rgba(255, 255, 255, 0.2)"
+    },
+    "semantic": {
+      "success": "#4CAF50",
+      "error": "#F44336",
+      "warning": "#FFC107",
+      "info": "#2196F3"
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": {
+      "blurIntensity": 20,
+      "overlayOpacity": 0.08,
+      "borderColor": "rgba(255, 255, 255, 0.12)",
+      "borderWidth": 1
+    },
+    "noise": {
+      "opacity": 0.03,
+      "texture": "grain"
+    },
+    "shadows": {
+      "glow": "0px 0px 20px rgba(255, 95, 5, 0.4)",
+      "soft": "0px 10px 30px rgba(0, 0, 0, 0.5)"
+    },
+    "orb": {
+      "library": "@shopify/react-native-skia",
+      "type": "shader",
+      "description": "A reactive 3D-like orb that pulses with simulated audio amplitude."
+    }
+  },
+  "spacing": {
+    "scale": {
+      "xs": 4,
+      "s": 8,
+      "m": 16,
+      "l": 24,
+      "xl": 32,
+      "xxl": 48,
+      "xxxl": 64
+    },
+    "layout": {
+      "screenPadding": 20,
+      "cardPadding": 20,
+      "thumbZoneBottom": 100
+    }
+  },
+  "components": [
+    {
+      "name": "GlassPanel",
+      "path": "src/components/ui/GlassPanel.tsx",
+      "description": "A container with BlurView, semi-transparent background, and thin border.",
+      "props": ["children", "intensity", "style"]
+    },
+    {
+      "name": "PrimaryButton",
+      "path": "src/components/ui/PrimaryButton.tsx",
+      "description": "Pill-shaped button with brand orange gradient or solid fill. Haptic feedback on press.",
+      "props": ["title", "onPress", "icon", "loading"]
+    },
+    {
+      "name": "VolumeSlider",
+      "path": "src/components/ui/VolumeSlider.tsx",
+      "description": "Custom slider with thick track, glowing fill, and haptic feedback on drag.",
+      "props": ["value", "onValueChange"]
+    },
+    {
+      "name": "OrbVisualizer",
+      "path": "src/components/visual/OrbVisualizer.tsx",
+      "description": "Skia Canvas with a custom shader rendering a glowing, pulsing orb.",
+      "props": ["amplitude", "color"]
+    },
+    {
+      "name": "SpeakerCard",
+      "path": "src/components/feature/SpeakerCard.tsx",
+      "description": "Glass card showing speaker status, name, and now playing info.",
+      "props": ["speaker", "onSelect"]
+    }
+  ],
+  "screens": [
+    {
+      "name": "Onboarding",
+      "route": "/onboarding",
+      "description": "Introduction to casting. Permissions request."
+    },
+    {
+      "name": "Auth",
+      "route": "/auth",
+      "description": "Login/Signup with Email + Password / Magic Link."
+    },
+    {
+      "name": "Discovery",
+      "route": "/discovery",
+      "description": "Scanning for speakers. List of found devices."
+    },
+    {
+      "name": "Casting",
+      "route": "/casting",
+      "description": "Main controller. Hero Orb, Playback controls, Volume."
+    },
+    {
+      "name": "Settings",
+      "route": "/settings",
+      "description": "App configuration, diagnostics, account."
+    },
+    {
+      "name": "OrbLab",
+      "route": "/orb-lab",
+      "description": "Developer tool to tweak orb parameters."
+    }
+  ],
+  "image_urls": {
+    "album_art": [
+      {
+        "url": "https://images.unsplash.com/photo-1623200402230-574ca7b1b892?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "category": "album_art",
+        "description": "Abstract white and black floral textile"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1589509910662-8f1f65612182?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "category": "album_art",
+        "description": "Green and purple plant in black background"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1752572515417-8448a893b7ae?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "category": "album_art",
+        "description": "Black rectangle framed by dark, textured colors"
+      },
+       {
+        "url": "https://images.unsplash.com/photo-1581084349663-7ab88c58d362?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "category": "album_art",
+        "description": "Black and pink abstract painting"
+      }
+    ]
+  },
+  "universal_guidelines": [
+    "Use StyleSheet.create for styles but import tokens from src/design/tokens.ts",
+    "All interactive elements must have haptic feedback (expo-haptics).",
+    "Animations must run at 60fps using Reanimated worklets.",
+    "Accessibility: Ensure 4.5:1 contrast ratio for text.",
+    "Respect 'prefers-reduced-motion'.",
+    "Use 'lucide-react-native' for icons.",
+    "Use 'expo-linear-gradient' for backgrounds.",
+    "Never use pure black (#000000) for backgrounds; use the Navy theme.",
+    "The 'Orb' must be the central focus of the Casting screen.",
+    "Glassmorphism must be implemented with 'expo-blur' and specific semi-transparent backgrounds."
+  ],
+  "dependencies_to_install": [
+    "@shopify/react-native-skia",
+    "zustand",
+    "@tanstack/react-query",
+    "@supabase/supabase-js",
+    "lucide-react-native",
+    "react-native-svg",
+    "expo-linear-gradient",
+    "expo-haptics",
+    "clsx",
+    "tailwind-merge"
+  ],
+   "instructions_to_main_agent": "1. Install the required dependencies. 2. Create the 'src/design/tokens.ts' file first. 3. Build the core UI components (GlassPanel, Button, Slider). 4. Implement the OrbVisualizer using Skia. 5. Build the screens using Expo Router."
+}
