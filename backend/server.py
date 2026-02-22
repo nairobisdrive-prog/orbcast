@@ -1,75 +1,86 @@
-from fastapi import FastAPI, APIRouter
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
-import logging
-from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List
-import uuid
-from datetime import datetime
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, JSONResponse
+import asyncio
+import time
 
-
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
-
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
-# Create the main app without a prefix
-app = FastAPI()
-
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
-
-
-# Define Models
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
-
-# Include the router in the main app
-app.include_router(api_router)
+app = FastAPI(title="OrbCast API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+@app.get("/api/health")
+async def health():
+    return {"status": "ok", "service": "orbcast-api", "version": "1.0.0"}
+
+
+@app.get("/api/network-info")
+async def network_info(request: Request):
+    """Returns the host/base URL — used to build the Sonos stream URL."""
+    host = request.headers.get("host", "localhost:8001")
+    scheme = "https" if "emergentagent" in host else "http"
+    return {"streamUrl": f"{scheme}://{host}/api/stream", "host": host}
+
+
+@app.get("/api/stream")
+async def audio_stream():
+    """
+    Mock audio stream endpoint compatible with Sonos AVTransport.
+    Sonos will pull from this URL when casting is active.
+    In production: replace with real PCM→AAC/MP3 encoder pipeline.
+    
+    This endpoint returns an infinite stream of audio silence
+    with proper HTTP headers for streaming playback.
+    """
+    def generate_silence():
+        """Generate WAV-format silence chunks."""
+        # WAV header (44 bytes) for 44100Hz, 16-bit stereo PCM
+        sample_rate = 44100
+        num_channels = 2
+        bits_per_sample = 16
+        byte_rate = sample_rate * num_channels * bits_per_sample // 8
+        block_align = num_channels * bits_per_sample // 8
+
+        # Chunk size = very large for streaming
+        wav_header = b"RIFF"
+        wav_header += (0xFFFFFFFF).to_bytes(4, "little")  # File size (streaming = unknown)
+        wav_header += b"WAVE"
+        wav_header += b"fmt "
+        wav_header += (16).to_bytes(4, "little")  # Subchunk1Size
+        wav_header += (1).to_bytes(2, "little")   # AudioFormat = PCM
+        wav_header += num_channels.to_bytes(2, "little")
+        wav_header += sample_rate.to_bytes(4, "little")
+        wav_header += byte_rate.to_bytes(4, "little")
+        wav_header += block_align.to_bytes(2, "little")
+        wav_header += bits_per_sample.to_bytes(2, "little")
+        wav_header += b"data"
+        wav_header += (0xFFFFFFFF).to_bytes(4, "little")  # Data size (streaming)
+
+        yield wav_header
+
+        # Silence chunks: 100ms at a time
+        chunk_duration = 0.1  # seconds
+        chunk_size = int(sample_rate * num_channels * (bits_per_sample // 8) * chunk_duration)
+        silence_chunk = bytes(chunk_size)
+
+        while True:
+            yield silence_chunk
+            time.sleep(chunk_duration * 0.9)  # slight underrun tolerance
+
+    return StreamingResponse(
+        generate_silence(),
+        media_type="audio/wav",
+        headers={
+            "icy-name": "OrbCast Stream",
+            "icy-br": "128",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
