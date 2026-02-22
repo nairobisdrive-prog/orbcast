@@ -16,7 +16,7 @@ Build OrbCast — a premium Android audio casting app that routes phone audio to
 - **Database:** Supabase (PostgreSQL)
 - **Auth:** Supabase (email+password + magic link)
 
-## What's Been Implemented (MVP)
+## What's Been Implemented (MVP — COMPLETE Feb 2026)
 
 ### Screens
 - **Onboarding** (2-slide flow, orb preview, permissions explanation)
