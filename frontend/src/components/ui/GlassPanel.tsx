@@ -4,11 +4,12 @@ import { BlurView } from 'expo-blur';
 import { colors, radii } from '../../design/tokens';
 
 interface GlassPanelProps {
-  children: React.ReactNode;
-  style?: ViewStyle;
+  children?: React.ReactNode;
+  style?: any;
   intensity?: number;
   radius?: number;
   padding?: number;
+  testID?: string;
 }
 
 export function GlassPanel({

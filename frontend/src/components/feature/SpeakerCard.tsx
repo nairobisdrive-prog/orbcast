@@ -36,8 +36,8 @@ export function SpeakerCard({ device, isSelected, onPress, testID }: SpeakerCard
         padding={16}
         style={[
           styles.card,
-          isSelected && styles.selectedCard,
-        ]}
+          isSelected ? styles.selectedCard : undefined,
+        ] as any}
       >
         <View style={styles.row}>
           {/* Status dot */}
