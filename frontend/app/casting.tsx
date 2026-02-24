@@ -11,9 +11,6 @@ import {
 import Animated, {
   FadeInDown,
   FadeIn,
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -22,25 +19,36 @@ import { OrbVisualizer } from '../src/components/visual/OrbVisualizer';
 import { VolumeSlider } from '../src/components/ui/VolumeSlider';
 import { GlassPanel } from '../src/components/ui/GlassPanel';
 import { PrimaryButton } from '../src/components/ui/PrimaryButton';
-import { useSonosStore, useCastingStore } from '../src/store';
+import { useSonosStore, useCastingStore, useSettingsStore } from '../src/store';
 import { audioManager } from '../src/audio/audioManager';
 import { startCasting, stop, setVolume as setSonosVolume } from '../src/sonos/sonosController';
-import { colors, fontFamilies, fontSizes, spacing, radii } from '../src/design/tokens';
+import { colors, fontFamilies, fontSizes, spacing } from '../src/design/tokens';
 import type { AudioMetrics } from '../src/audio/audioManager';
 
 const { width: W } = Dimensions.get('window');
+
+// Cloud backend stream (MP3) — fallback when phone-local server is unavailable
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
-const STREAM_URL = `${BACKEND_URL}/api/stream`;
+const CLOUD_STREAM_URL = `${BACKEND_URL}/api/stream`;
 
 export default function Casting() {
   const router = useRouter();
   const { devices, selectedDevices } = useSonosStore();
-  const { isCasting, sourceLabel, captureMode, audioMetrics, setIsCasting, setAudioMetrics, setStreamUrl } = useCastingStore();
+  const {
+    isCasting, sourceLabel, captureMode, audioMetrics,
+    setIsCasting, setAudioMetrics, setStreamUrl, setCaptureMode,
+  } = useCastingStore();
 
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
+  const [localStreamUrl, setLocalStreamUrl] = useState<string | null>(null);
 
   const selectedDevice = devices.find((d) => selectedDevices[0] === d.id);
+
+  // Load settings from Supabase on mount
+  useEffect(() => {
+    useSettingsStore.getState().loadFromSupabase();
+  }, []);
 
   // Subscribe to audio manager
   useEffect(() => {
@@ -48,7 +56,18 @@ export default function Casting() {
     const unsub = audioManager.subscribe((metrics: AudioMetrics) => {
       setAudioMetrics(metrics);
     });
-    audioManager.start('demo');
+
+    // Try system capture first; fall back to demo
+    audioManager.start('system').then((url) => {
+      if (url) {
+        setLocalStreamUrl(url);
+        setCaptureMode('system');
+      } else {
+        audioManager.start('demo');
+        setCaptureMode(audioManager.mode);
+      }
+    });
+
     return () => {
       unsub();
       audioManager.stop();
@@ -59,14 +78,19 @@ export default function Casting() {
     audioManager.setVolume(isMuted ? 0 : volume);
   }, [volume, isMuted]);
 
+  // The stream URL Sonos will connect to:
+  // 1. Phone-local TCP server (best: real audio)
+  // 2. Cloud backend (fallback: MP3 silence demo)
+  const activeStreamUrl = localStreamUrl || CLOUD_STREAM_URL;
+
   const handleStartCasting = async () => {
     if (!selectedDevice) {
       router.push('/discovery');
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    setStreamUrl(STREAM_URL);
-    await startCasting(selectedDevice, STREAM_URL);
+    setStreamUrl(activeStreamUrl);
+    await startCasting(selectedDevice, activeStreamUrl);
     setIsCasting(true);
   };
 
@@ -88,6 +112,12 @@ export default function Casting() {
   };
 
   const metrics = audioMetrics;
+
+  const captureModeLabel =
+    captureMode === 'system' ? 'Live audio' :
+    captureMode === 'mic' ? 'Microphone' :
+    captureMode === 'blocked' ? 'Capture blocked' :
+    'Demo mode';
 
   return (
     <LinearGradient colors={['#00001A', '#000033', '#13294B']} style={styles.gradient}>
@@ -132,7 +162,7 @@ export default function Casting() {
                   </Text>
                   <Text style={styles.nowPlayingMode}>
                     {isCasting
-                      ? `Demo mode • ${STREAM_URL.slice(0, 32)}…`
+                      ? `${captureModeLabel} · ${activeStreamUrl.replace(/^https?:\/\//, '').slice(0, 28)}…`
                       : 'Tap below to start'}
                   </Text>
                 </View>
@@ -151,7 +181,6 @@ export default function Casting() {
 
           {/* Controls */}
           <Animated.View entering={FadeInDown.delay(400).duration(500)} style={styles.controls}>
-            {/* Mute */}
             <TouchableOpacity
               testID="casting-mute-btn"
               onPress={handleMute}
@@ -160,7 +189,6 @@ export default function Casting() {
               <Text style={styles.iconControlText}>{isMuted ? '🔇' : '🔊'}</Text>
             </TouchableOpacity>
 
-            {/* Main cast / stop */}
             {isCasting ? (
               <PrimaryButton
                 testID="casting-stop-btn"
@@ -178,7 +206,6 @@ export default function Casting() {
               />
             )}
 
-            {/* Receivers */}
             <TouchableOpacity
               testID="casting-receivers-btn"
               onPress={() => router.push('/receivers')}
@@ -188,12 +215,14 @@ export default function Casting() {
             </TouchableOpacity>
           </Animated.View>
 
-          {/* Capture notice */}
+          {/* Capture status notice */}
           {captureMode === 'blocked' && (
             <GlassPanel style={styles.captureNotice} padding={12}>
               <Text style={styles.captureTitle}>Audio capture restricted</Text>
               <Text style={styles.captureBody}>
-                This app is running in demo mode. Android restricts capturing audio from other apps. See Settings → Diagnostics for options.
+                System audio capture requires a custom dev build with MediaProjection.
+                Streaming cloud MP3 to Sonos instead — real audio capture coming in the
+                next build. See Settings → Diagnostics.
               </Text>
             </GlassPanel>
           )}
@@ -214,12 +243,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  speakerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
+  speakerBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   speakerDot: { width: 8, height: 8, borderRadius: 4 },
   speakerName: {
     color: colors.text.primary,
@@ -231,7 +255,14 @@ const styles = StyleSheet.create({
   iconBtn: { padding: 4 },
   iconBtnText: { fontSize: 20 },
   scroll: { paddingHorizontal: spacing.screenPadding, paddingBottom: 40 },
-  orbStage: { alignItems: 'center', justifyContent: 'center', marginVertical: 8, position: 'relative', maxHeight: 260, height: 260 },
+  orbStage: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 8,
+    position: 'relative',
+    maxHeight: 260,
+    height: 260,
+  },
   orbGlow: {
     position: 'absolute',
     width: W * 0.6,
