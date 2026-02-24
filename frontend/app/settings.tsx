@@ -133,6 +133,16 @@ export default function Settings() {
           <Text style={styles.sectionLabel}>Diagnostics</Text>
           <GlassPanel padding={16} style={styles.card}>
             <View style={styles.diagRow}>
+              <Text style={styles.diagLabel}>Stream format</Text>
+              <Text style={styles.diagValue}>audio/mpeg (MP3)</Text>
+            </View>
+            <View style={styles.diagRow}>
+              <Text style={styles.diagLabel}>Capture mode</Text>
+              <Text style={[styles.diagValue, { color: captureMode === 'system' ? colors.status.casting : colors.text.primary }]}>
+                {captureMode ?? 'demo'}
+              </Text>
+            </View>
+            <View style={styles.diagRow}>
               <Text style={styles.diagLabel}>Discovered devices</Text>
               <Text style={styles.diagValue}>{devices.length}</Text>
             </View>
