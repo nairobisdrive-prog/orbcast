@@ -16,17 +16,17 @@ import type { AudioQuality } from '../src/types';
 
 export default function Settings() {
   const router = useRouter();
-  const { audioQuality, reduceMotion, setAudioQuality, setLatencyHint } = useSettingsStore();
+  const { audioQuality, reduceMotion, setAudioQuality, setReduceMotion, loadFromSupabase } = useSettingsStore();
   const { devices, selectedDevices } = useSonosStore();
-  const { isCasting, streamUrl, connectedClients, bufferFill } = useCastingStore();
+  const { isCasting, streamUrl, connectedClients, captureMode } = useCastingStore();
 
   const [user, setUser] = useState<any>(null);
-  const [rm, setRm] = useState(reduceMotion);
   const [handshakeResult, setHandshakeResult] = useState<string | null>(null);
   const [handshakePending, setHandshakePending] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    loadFromSupabase();
   }, []);
 
   const handleSignOut = async () => {
