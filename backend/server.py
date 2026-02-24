@@ -79,7 +79,6 @@ async def audio_stream():
             "icy-metaint": "0",
             "Cache-Control": "no-cache, no-store",
             "Connection": "keep-alive",
-            "Transfer-Encoding": "chunked",
             "Access-Control-Allow-Origin": "*",
             "X-Content-Type-Options": "nosniff",
         },
