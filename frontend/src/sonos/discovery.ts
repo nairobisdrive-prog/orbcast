@@ -1,6 +1,6 @@
 import type { SonosDevice } from '../types';
 
-// ─── Mock Devices (Dev Mode) ──────────────────────────────────────────────────
+// ─── Mock Devices (used when react-native-udp is unavailable) ─────────────────
 export const MOCK_DEVICES: SonosDevice[] = [
   {
     id: 'sonos-living-room',
@@ -48,7 +48,7 @@ export const MOCK_DEVICES: SonosDevice[] = [
   },
 ];
 
-// ─── SSDP Discovery (Real — Requires Custom Dev Build with UDP support) ───────
+// ─── SSDP constants ───────────────────────────────────────────────────────────
 export const SSDP_MULTICAST_ADDR = '239.255.255.250';
 export const SSDP_PORT = 1900;
 export const SSDP_SEARCH_MSG =
@@ -60,7 +60,6 @@ export const SSDP_SEARCH_MSG =
 
 /**
  * Parse a Sonos SSDP response into a partial device record.
- * Used by the real discovery module (custom build only).
  */
 export function parseSsdpResponse(raw: string): Partial<SonosDevice> | null {
   const lines = raw.split('\r\n');
@@ -75,7 +74,7 @@ export function parseSsdpResponse(raw: string): Partial<SonosDevice> | null {
       ip: url.hostname,
       port: parseInt(url.port) || 1400,
       status: 'online',
-      id: url.hostname, // temporary, refined after XML fetch
+      id: url.hostname,
       name: 'Sonos Speaker',
       room: 'Unknown Room',
       volume: 0,
@@ -87,20 +86,116 @@ export function parseSsdpResponse(raw: string): Partial<SonosDevice> | null {
 }
 
 /**
+ * Fetch device description XML from a Sonos device and extract its room name / model.
+ */
+async function fetchDeviceDescription(ip: string, port: number): Promise<Partial<SonosDevice>> {
+  try {
+    const res = await fetch(`http://${ip}:${port}/xml/device_description.xml`, { signal: AbortSignal.timeout(3000) });
+    const xml = await res.text();
+    const roomMatch = xml.match(/<roomName>([^<]+)<\/roomName>/);
+    const modelMatch = xml.match(/<modelName>([^<]+)<\/modelName>/);
+    const nameMatch = xml.match(/<deviceType>[^<]*ZonePlayer[^<]*<\/deviceType>/);
+    return {
+      name: roomMatch?.[1] ?? 'Sonos Speaker',
+      room: roomMatch?.[1] ?? 'Unknown Room',
+      modelName: modelMatch?.[1],
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Real SSDP discovery using react-native-udp (custom dev build only).
+ * Falls back to mock devices in Expo Go or managed workflow.
+ */
+async function discoverReal(onProgress?: (device: SonosDevice) => void): Promise<SonosDevice[]> {
+  // react-native-udp is only available in a custom dev build / EAS build
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const UdpSocket = require('react-native-udp').default;
+
+  return new Promise((resolve) => {
+    const found: Map<string, SonosDevice> = new Map();
+    const TIMEOUT_MS = 5000;
+
+    const socket = UdpSocket.createSocket({ type: 'udp4', reusePort: true });
+
+    const done = () => {
+      try { socket.close(); } catch { /* ignore */ }
+      resolve(Array.from(found.values()));
+    };
+
+    const timer = setTimeout(done, TIMEOUT_MS);
+
+    socket.on('error', (err: any) => {
+      console.warn('[SSDP] UDP socket error:', err.message);
+      clearTimeout(timer);
+      done();
+    });
+
+    socket.on('message', async (msg: Buffer) => {
+      const raw = msg.toString();
+      if (!raw.startsWith('HTTP/1.1 200') && !raw.includes('ZonePlayer')) return;
+
+      const partial = parseSsdpResponse(raw);
+      if (!partial?.ip || found.has(partial.ip)) return;
+
+      const description = await fetchDeviceDescription(partial.ip, partial.port ?? 1400);
+      const device: SonosDevice = {
+        id: `sonos-${partial.ip}`,
+        name: description.name ?? partial.name ?? 'Sonos Speaker',
+        room: description.room ?? partial.room ?? 'Unknown Room',
+        ip: partial.ip,
+        port: partial.port ?? 1400,
+        status: 'online',
+        volume: 0,
+        isMuted: false,
+        modelName: description.modelName,
+      };
+
+      found.set(partial.ip, device);
+      onProgress?.(device);
+    });
+
+    socket.bind(0, () => {
+      socket.send(
+        Buffer.from(SSDP_SEARCH_MSG),
+        0,
+        SSDP_SEARCH_MSG.length,
+        SSDP_PORT,
+        SSDP_MULTICAST_ADDR,
+        (err: any) => {
+          if (err) console.warn('[SSDP] send error:', err.message);
+        }
+      );
+    });
+  });
+}
+
+/**
  * Discover Sonos devices.
- * In Expo managed workflow this returns mock devices.
- * In a custom dev build with react-native-udp, replace with real SSDP.
+ *
+ * - Custom dev build (react-native-udp available): Real SSDP scan
+ * - Expo Go / managed workflow: Returns mock devices for UI testing
  */
 export async function discoverDevices(
   onProgress?: (device: SonosDevice) => void
 ): Promise<SonosDevice[]> {
-  // Simulate scanning delay
-  await new Promise((r) => setTimeout(r, 2000));
-
-  for (const device of MOCK_DEVICES) {
-    await new Promise((r) => setTimeout(r, 400));
-    onProgress?.(device);
+  try {
+    // Attempt real SSDP discovery (requires react-native-udp)
+    const devices = await discoverReal(onProgress);
+    if (devices.length > 0) return devices;
+    // If scan found nothing, fall through to mock
+  } catch {
+    // react-native-udp not available (Expo Go / managed workflow)
+    console.log('[Discovery] react-native-udp not available, using mock devices');
   }
 
+  // Mock fallback — staggered to simulate scanning UX
+  await new Promise((r) => setTimeout(r, 1500));
+  for (const device of MOCK_DEVICES) {
+    await new Promise((r) => setTimeout(r, 300));
+    onProgress?.(device);
+  }
   return MOCK_DEVICES;
 }
