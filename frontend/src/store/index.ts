@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../lib/supabase';
 import type { SonosDevice, AudioMetrics, AppSettings, CastingState } from '../types';
 
 // ─── App Store ────────────────────────────────────────────────────────────────
@@ -19,7 +20,7 @@ export const useAppStore = create<AppStore>((set) => ({
 // ─── Sonos Store ──────────────────────────────────────────────────────────────
 interface SonosStore {
   devices: SonosDevice[];
-  selectedDevices: string[]; // device IDs
+  selectedDevices: string[];
   isScanning: boolean;
   setDevices: (devices: SonosDevice[]) => void;
   setIsScanning: (val: boolean) => void;
@@ -80,19 +81,88 @@ export const useCastingStore = create<CastingStore>((set) => ({
   updateConnectedClients: (n) => set({ connectedClients: n }),
 }));
 
-// ─── Settings Store ───────────────────────────────────────────────────────────
+// ─── Settings Store (with Supabase sync) ─────────────────────────────────────
 interface SettingsStore extends AppSettings {
+  _syncing: boolean;
   setAudioQuality: (q: AppSettings['audioQuality']) => void;
   setLatencyHint: (ms: number) => void;
   setSourceLabel: (label: string) => void;
+  setReduceMotion: (val: boolean) => void;
+  /** Load settings from Supabase for the currently signed-in user. */
+  loadFromSupabase: () => Promise<void>;
+  /** Persist current settings to Supabase (upsert). */
+  saveToSupabase: () => Promise<void>;
 }
 
-export const useSettingsStore = create<SettingsStore>((set) => ({
+export const useSettingsStore = create<SettingsStore>((set, get) => ({
   audioQuality: 'medium',
   latencyHint: 200,
   reduceMotion: false,
   sourceLabel: 'Device Audio',
-  setAudioQuality: (q) => set({ audioQuality: q }),
+  _syncing: false,
+
+  setAudioQuality: (q) => {
+    set({ audioQuality: q });
+    get().saveToSupabase();
+  },
   setLatencyHint: (ms) => set({ latencyHint: ms }),
   setSourceLabel: (label) => set({ sourceLabel: label }),
+  setReduceMotion: (val) => {
+    set({ reduceMotion: val });
+    get().saveToSupabase();
+  },
+
+  loadFromSupabase: async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('settings')
+        .select('audio_quality, reduce_motion, last_selected_output_ids')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !data) return;
+
+      set({
+        audioQuality: (data.audio_quality as AppSettings['audioQuality']) ?? 'medium',
+        reduceMotion: data.reduce_motion ?? false,
+      });
+
+      // Restore last selected Sonos devices
+      if (data.last_selected_output_ids?.length) {
+        useSonosStore.getState().setSelectedDevices(data.last_selected_output_ids);
+      }
+    } catch (e) {
+      console.warn('[Settings] loadFromSupabase failed:', e);
+    }
+  },
+
+  saveToSupabase: async () => {
+    if (get()._syncing) return;
+    try {
+      set({ _syncing: true });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { audioQuality, reduceMotion } = get();
+      const selectedIds = useSonosStore.getState().selectedDevices;
+
+      await supabase.from('settings').upsert(
+        {
+          user_id: user.id,
+          audio_quality: audioQuality,
+          reduce_motion: reduceMotion,
+          last_selected_output_ids: selectedIds,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      );
+    } catch (e) {
+      console.warn('[Settings] saveToSupabase failed:', e);
+    } finally {
+      set({ _syncing: false });
+    }
+  },
 }));

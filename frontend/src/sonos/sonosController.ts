@@ -1,5 +1,7 @@
 import {
   sendSoapCommand,
+  buildDIDLMetadata,
+  xmlEscape,
   AVTRANSPORT_SERVICE,
   RENDERING_CONTROL_SERVICE,
   AVTRANSPORT_PATH,
@@ -7,10 +9,14 @@ import {
 } from './soapClient';
 import type { SonosDevice } from '../types';
 
-const DEV_MODE = true; // Set to false when testing with real Sonos hardware
+// ── Production mode ───────────────────────────────────────────────────────────
+// Set to true ONLY during Expo Go / managed workflow demo (no real Sonos commands)
+// Set to false when testing on a local network with real Sonos hardware
+const DEV_MODE = false;
 
 /**
  * Set the stream URL on a Sonos device (AVTransport).
+ * Includes proper DIDL-Lite XML metadata so Sonos treats the URL as an MP3 radio stream.
  */
 export async function setAVTransportURI(
   device: SonosDevice,
@@ -20,10 +26,11 @@ export async function setAVTransportURI(
     console.log(`[Sonos MOCK] SetAVTransportURI → ${device.name}: ${streamUrl}`);
     return;
   }
+  const metadata = buildDIDLMetadata('OrbCast', streamUrl);
   await sendSoapCommand(device.ip, device.port, AVTRANSPORT_PATH, AVTRANSPORT_SERVICE, 'SetAVTransportURI', {
     InstanceID: 0,
     CurrentURI: streamUrl,
-    CurrentURIMetaData: '',
+    CurrentURIMetaData: metadata,
   });
 }
 
@@ -70,11 +77,11 @@ export async function setVolume(device: SonosDevice, volume: number): Promise<vo
 }
 
 /**
- * Start casting: set URI → play.
+ * Start casting: set URI (with MP3 metadata) → brief pause → play.
  */
 export async function startCasting(device: SonosDevice, streamUrl: string): Promise<void> {
   await setAVTransportURI(device, streamUrl);
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 500));
   await play(device);
 }
 
@@ -91,7 +98,7 @@ export async function handshakeTest(device: SonosDevice): Promise<string> {
       InstanceID: 0,
       Channel: 'Master',
     });
-    return `${device.name} — handshake OK`;
+    return `${device.name} (${device.ip}:${device.port}) — handshake OK`;
   } catch (e: any) {
     return `${device.name} — FAILED: ${e.message}`;
   }

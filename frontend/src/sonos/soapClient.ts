@@ -10,7 +10,46 @@ export const AVTRANSPORT_PATH = '/MediaRenderer/AVTransport/Control';
 export const RENDERING_PATH = '/MediaRenderer/RenderingControl/Control';
 
 /**
+ * XML-escape a string for safe embedding in SOAP/XML payloads.
+ * Required for CurrentURIMetaData which contains XML that must be escaped.
+ */
+export function xmlEscape(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * Build DIDL-Lite XML metadata for an MP3 radio stream.
+ * This tells Sonos: "treat this URL as an internet radio / audio broadcast stream."
+ * The <res protocolInfo="http-get:*:audio/mpeg:*"> element ensures Sonos
+ * interprets the stream as MP3 (not HTML, not WAV).
+ */
+export function buildDIDLMetadata(title: string, streamUrl: string): string {
+  // Inner XML is constructed, then this string is XML-escaped when embedded in SOAP
+  return (
+    '<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/"' +
+    ' xmlns:dc="http://purl.org/dc/elements/1.1/"' +
+    ' xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/"' +
+    ' xmlns:r="urn:schemas-rinconnetworks-com:metadata-1-0/">' +
+    '<item id="R:0/0/0" parentID="R:0/0" restricted="true">' +
+    `<dc:title>${xmlEscape(title)}</dc:title>` +
+    '<upnp:class>object.item.audioItem.audioBroadcast</upnp:class>' +
+    `<res protocolInfo="http-get:*:audio/mpeg:*">${xmlEscape(streamUrl)}</res>` +
+    '<desc id="cdudn" nameSpace="urn:schemas-rinconnetworks-com:metadata-1-0/">' +
+    'SA_RINCON65031_' +
+    '</desc>' +
+    '</item>' +
+    '</DIDL-Lite>'
+  );
+}
+
+/**
  * Build a SOAP envelope for a UPnP action.
+ * String values are XML-escaped to prevent breaking the envelope structure.
  */
 export function buildSoapEnvelope(
   serviceType: string,
@@ -18,7 +57,7 @@ export function buildSoapEnvelope(
   params: Record<string, string | number>
 ): string {
   const paramXml = Object.entries(params)
-    .map(([k, v]) => `<${k}>${v}</${k}>`)
+    .map(([k, v]) => `<${k}>${typeof v === 'string' ? xmlEscape(v) : v}</${k}>`)
     .join('');
 
   return (
@@ -64,13 +103,13 @@ export async function sendSoapCommand(
   return response.text();
 }
 
-// ─── AVTransport Commands ─────────────────────────────────────────────────────
+// ─── Convenience builders ─────────────────────────────────────────────────────
 
-export function buildSetAVTransportURI(streamUrl: string): string {
+export function buildSetAVTransportURI(streamUrl: string, title = 'OrbCast'): string {
   return buildSoapEnvelope(AVTRANSPORT_SERVICE, 'SetAVTransportURI', {
     InstanceID: 0,
     CurrentURI: streamUrl,
-    CurrentURIMetaData: '',
+    CurrentURIMetaData: buildDIDLMetadata(title, streamUrl),
   });
 }
 
@@ -86,8 +125,6 @@ export function buildStop(): string {
     InstanceID: 0,
   });
 }
-
-// ─── RenderingControl Commands ────────────────────────────────────────────────
 
 export function buildSetVolume(volume: number): string {
   return buildSoapEnvelope(RENDERING_CONTROL_SERVICE, 'SetVolume', {
