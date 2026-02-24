@@ -1,98 +1,105 @@
-# OrbCast PRD
+# OrbCast PRD — Phone-to-Sonos Audio Casting
 
-**Last Updated:** February 2026
-**Status:** MVP Complete
-
-## Problem Statement
-Build OrbCast — a premium Android audio casting app that routes phone audio to Sonos speakers. Better UX than AirMusic. Luxury/futuristic design. One-tap casting flow.
+## Overview
+OrbCast is a React Native (Expo) app that discovers Sonos speakers on the local network and casts audio from the phone to them. Features a fluid orb visualizer that reacts to the audio signal.
 
 ## Architecture
-- **Frontend:** Expo SDK 54, React Native 0.81.5, TypeScript
-- **Navigation:** expo-router (file-based)
-- **State:** Zustand + TanStack Query
-- **UI:** expo-blur, expo-linear-gradient, react-native-svg + Reanimated (orb)
-- **Fonts:** Syne (headings) + Manrope (body) + SpaceMono (mono)
-- **Backend:** FastAPI (Python) — health check + WAV silence stream
-- **Database:** Supabase (PostgreSQL)
-- **Auth:** Supabase (email+password + magic link)
 
-## What's Been Implemented (MVP — COMPLETE Feb 2026)
+### Frontend (Expo SDK 54 / React Native)
+- **Router**: expo-router (file-based, typed routes)
+- **State**: Zustand stores (`useAppStore`, `useSonosStore`, `useCastingStore`, `useSettingsStore`)
+- **UI**: Custom design system (`src/design/tokens.ts`), Skia (`@shopify/react-native-skia`), Reanimated 4
+- **Supabase**: Auth + `settings`, `profiles`, `device_nicknames` tables
 
-### Screens
-- **Onboarding** (2-slide flow, orb preview, permissions explanation)
-- **Auth** (email+password + magic link OTP)
-- **Discovery** (mock SSDP, 4 Sonos devices, selection)
-- **Casting** (hero screen: reactive orb, volume slider, cast controls, now playing)
-- **Receivers** (Sonos tab + Other tab with extensible adapter system)
-- **Settings** (audio quality, reduce motion, diagnostics, handshake test)
-- **Orb Lab** (dev tool: sliders + presets for orb simulation)
+### Backend (FastAPI, Python)
+- **Port**: 8001 (supervisor-managed)
+- **Stream endpoint**: `GET /api/stream` → `audio/mpeg` 128kbps MP3 (lameenc)
+- **Info endpoint**: `GET /api/network-info` → returns `streamUrl`
 
-### Architecture Modules
-- `src/sonos/discovery.ts` — mock SSDP (4 devices), real SSDP scaffold
-- `src/sonos/soapClient.ts` — SOAP envelope builder for UPnP
-- `src/sonos/sonosController.ts` — high-level Sonos commands (dev mode)
-- `src/receivers/ReceiverAdapter.ts` — extensible adapter interface
-- `src/receivers/MockAdapter.ts` — demo + Chromecast placeholder
-- `src/audio/audioManager.ts` — simulated audio signal (20fps demo mode)
-- `src/store/index.ts` — Zustand stores (app, sonos, casting, settings)
-- `src/lib/supabase.ts` — Supabase client (SSR-safe)
-- `src/design/tokens.ts` — full design system tokens
+### Casting Pipeline (Production)
+```
+Phone MediaProjection → PCM → TcpStreamServer (react-native-tcp-socket:9000)
+         ↓
+  Sonos connects to http://<phone-ip>:9000/stream.mp3
+         ↓
+  OR falls back to cloud backend: /api/stream
+```
 
-### Backend
-- `GET /api/health` — health check
-- `GET /api/stream` — WAV silence stream (Sonos-compatible)
-- `GET /api/network-info` — returns stream URL
+## Key Technical Decisions
+- **MP3 not WAV, not HTML** — `audio/mpeg` content-type, MPEG-1 Layer 3 frames
+- **DIDL-Lite metadata** — `object.item.audioItem.audioBroadcast` + `SA_RINCON65031_` descriptor
+- **SOAP XML-escaping** — `CurrentURIMetaData` is XML-escaped before embedding in SOAP envelope
+- **DEV_MODE = false** — Real Sonos commands sent (not mocked)
+- **Graceful fallback** — react-native-udp/tcp-socket/MediaProjection fail silently in Expo Go
 
-### Database Schema (Supabase)
-- `profiles` table with RLS
-- `device_nicknames` table with RLS
-- `settings` table with RLS
-- Auto-create profile/settings trigger on user signup
+## Screens
+- `/` (index) → redirect to `/casting`
+- `/casting` — main casting + orb visualizer
+- `/discovery` — SSDP scan + speaker list
+- `/receivers` — receiver management
+- `/settings` — audio quality, Supabase sync, diagnostics, handshake test
+- `/auth` — Supabase email auth
+- `/onboarding` — first-launch flow
+- `/orb-lab` — visualizer sandbox
 
-### Documentation
-- `/docs/design-thinking.md` — design philosophy
-- `/docs/architecture.md` — system architecture
-- `/docs/qa-checklist.md` — smoke test checklist
-- `/docs/limitations.md` — Android audio capture constraints
-- `/supabase/migrations/001_initial_schema.sql` — DB schema
+## Database Schema (Supabase)
+```sql
+-- profiles: id (uuid), display_name, email, updated_at
+-- device_nicknames: id, user_id, device_id, nickname
+-- settings: id, user_id, audio_quality, reduce_motion, last_selected_output_ids, updated_at
+-- All tables: RLS enabled, per-user policies
+-- Auto-create trigger on auth.users insert
+```
 
-## User Personas
-- **Primary:** Sonos owner, 30-50, tech-comfortable, wants frictionless casting
-- **Secondary:** Audio enthusiast who wants premium app UI
+## Custom Dev Build Requirements
+For real system audio capture (Android):
+```
+- react-native-udp         → SSDP discovery
+- react-native-tcp-socket  → Phone-side HTTP stream server
+- MediaProjection          → System audio capture native module
+- @react-native-community/netinfo → local IP detection
+```
 
-## Core Requirements (Static)
-1. Discover Sonos speakers (SSDP/mock)
-2. Cast audio to selected speakers via HTTP stream
-3. Reactive orb visualization driven by audio metrics
-4. Premium luxury UI (deep navy + orange, glassmorphism)
-5. Supabase auth + settings sync
+Android permissions required:
+```
+INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE,
+CHANGE_WIFI_MULTICAST_STATE, RECORD_AUDIO,
+FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PROJECTION,
+FOREGROUND_SERVICE_MEDIA_PLAYBACK
+```
+
+## What's Been Implemented (Feb 24, 2026)
+
+### Session: Production-ready Sonos casting
+1. **DEV_MODE = false** (`src/sonos/sonosController.ts`) — real SOAP commands
+2. **MP3 backend stream** (`backend/server.py`) — lameenc, `audio/mpeg`, `0xFFFA/FB` sync word
+3. **DIDL-Lite metadata** (`src/sonos/soapClient.ts`) — `buildDIDLMetadata()` with `audio/mpeg` protocolInfo, `SA_RINCON65031_` descriptor
+4. **XML escaping** (`soapClient.ts`) — `xmlEscape()` applied to SOAP string params
+5. **Real SSDP discovery** (`src/sonos/discovery.ts`) — conditional react-native-udp with mock fallback
+6. **TCP stream server** (`src/audio/tcpStreamServer.ts`) — phone-side HTTP server stub ready for MediaProjection
+7. **Supabase settings sync** (`src/store/index.ts`) — `loadFromSupabase` on mount, auto-save on changes
+8. **Casting screen** (`app/casting.tsx`) — tries system capture first, falls back to cloud MP3, shows capture mode
+9. **Settings screen** (`app/settings.tsx`) — reduce motion wired to store, loads from Supabase, shows stream format + capture mode in diagnostics
+10. **app.json** — Android permissions, EAS config, `expo-build-properties`
+11. **package.json** — `react-native-tcp-socket`, `react-native-udp`, `@react-native-community/netinfo`
 
 ## Prioritized Backlog
 
-### P0 (Blocker for production)
-- [ ] Real SSDP discovery (requires custom dev build with `react-native-udp`)
-- [ ] In-app TCP stream server (requires `react-native-tcp-socket`)
-- [ ] System audio capture (requires `MediaProjection` native module)
+### P0 (Blocking for production)
+- [ ] MediaProjection native module (`src/native/MediaProjectionCapture`) — actual PCM from Android system audio
+- [ ] MP3 encoding in TcpStreamServer (replace raw PCM passthrough with lame JSI encoder)
 
-### P1 (High value)
-- [ ] Speaker nickname editing in Discovery screen
-- [ ] Supabase settings sync (save/load from database)
-- [ ] Device nickname persistence to Supabase
-- [ ] Real Supabase auth flow testing end-to-end
-- [ ] Latency measurement display
-- [ ] Multi-speaker grouping UI
+### P1 (Important)
+- [ ] iOS support (Screen Capture Kit / ReplayKit)
+- [ ] Speaker grouping (Sonos zone groups)
+- [ ] Latency compensation tuning
 
 ### P2 (Nice to have)
-- [ ] Chromecast adapter (using `react-native-google-cast`)
-- [ ] DLNA adapter
-- [ ] Source label customization
-- [ ] Reduce motion respected from OS setting
-- [ ] Accessibility improvements (screen reader support)
-- [ ] Dark/Light theme option
+- [ ] Push notifications for cast status
+- [ ] Supabase realtime for multi-device sync
+- [ ] History / recent sessions
 
-## Next Tasks
-1. Run Supabase migration SQL in Supabase dashboard
-2. Test real auth flow with Supabase
-3. Build custom dev client for real SSDP + TCP stream
-4. Implement speaker nickname persistence
-5. Add settings sync to Supabase
+## Environment
+- Backend: `http://localhost:8001` (cloud), ENV vars: `MONGO_URL`, `DB_NAME`
+- Frontend: `EXPO_PUBLIC_BACKEND_URL`, `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- Supabase: `https://blhrcjfybdicasjbyuai.supabase.co`
