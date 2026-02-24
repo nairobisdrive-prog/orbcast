@@ -59,13 +59,13 @@ async def audio_stream():
         enc = _new_encoder()
         # Warm-up: yield 4 frames up-front so Sonos buffers quickly
         for _ in range(4):
-            chunk = enc.encode(_SILENCE_PCM)
+            chunk = bytes(enc.encode(_SILENCE_PCM))
             if chunk:
                 yield chunk
 
         # Continuous silence stream
         while True:
-            chunk = enc.encode(_SILENCE_PCM)
+            chunk = bytes(enc.encode(_SILENCE_PCM))
             if chunk:
                 yield chunk
             time.sleep(_CHUNK_MS / 1000 * 0.9)
