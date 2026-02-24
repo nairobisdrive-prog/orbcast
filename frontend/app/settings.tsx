@@ -109,8 +109,8 @@ export default function Settings() {
               </View>
               <Switch
                 testID="settings-reduce-motion"
-                value={rm}
-                onValueChange={(val) => { setRm(val); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                value={reduceMotion}
+                onValueChange={(val) => { setReduceMotion(val); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
                 trackColor={{ false: 'rgba(255,255,255,0.1)', true: colors.brand.primary }}
                 thumbColor="#fff"
               />
